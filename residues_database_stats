@@ -1,0 +1,81 @@
+"""
+Compute simple statistics on a residue database JSON file : number of
+force fields, number of unique residues, and number of unique residues
+per molecular type.
+"""
+
+import json
+from pathlib import Path
+
+import click
+from loguru import logger
+
+
+def compute_statistics(residue_db_json: Path) -> dict:
+    """
+    Compute statistics from the residue database JSON file.
+
+    Returns
+    -------
+    dict
+        Dictionary containing the force field count, the unique residue
+        count, and the unique residue count per molecular type.
+    """
+    with open(residue_db_json, "r") as f:
+        residue_database = json.load(f)
+
+    residues = residue_database["residues"]
+
+    force_field_set: set[str] = set()
+    type_to_residue_names: dict[str, set[str]] = {}
+
+    for residue_name in residues:
+        entry_list = residues[residue_name]
+
+        for entry in entry_list:
+            for force_field in entry["force_fields"]:
+                force_field_set.add(force_field)
+
+            molecule_type = entry["type"]
+            if molecule_type not in type_to_residue_names:
+                type_to_residue_names[molecule_type] = set()
+            type_to_residue_names[molecule_type].add(residue_name)
+
+    residue_count_per_type: dict[str, int] = {}
+    for molecule_type in type_to_residue_names:
+        residue_count_per_type[molecule_type] = len(
+            type_to_residue_names[molecule_type]
+        )
+
+    statistics = {
+        "force_field_count": len(force_field_set),
+        "force_fields": sorted(force_field_set),
+        "unique_residue_count": len(residues),
+        "residue_count_per_type": residue_count_per_type,
+    }
+
+    return statistics
+
+
+@click.command()
+@click.option(
+    "--residue-db-json",
+    required=True,
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to the residue database JSON file.",
+)
+def main(residue_db_json: Path):
+    statistics = compute_statistics(residue_db_json)
+
+    logger.info(f"Force fields found : {statistics['force_field_count']}")
+    logger.info(f"Unique residues found : {statistics['unique_residue_count']}")
+
+    for molecule_type in statistics["residue_count_per_type"]:
+        count = statistics["residue_count_per_type"][molecule_type]
+        logger.info(f"{molecule_type} : {count} unique residues")
+
+    click.echo(json.dumps(statistics, indent=2))
+
+
+if __name__ == "__main__":
+    main()
