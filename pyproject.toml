@@ -1,0 +1,27 @@
+[project]
+name = "mdverse-residue-database"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.4.2",
+    "logger>=1.4",
+    "loguru>=0.7.3",
+    "pydantic>=2.13.4",
+]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Ceci indique à hatchling où trouver le code source
+[tool.hatch.build.targets.wheel]
+packages = ["src/mdeverse_residue_database"]   
+
+# Pour installer en mode éditable avec uv
+[tool.uv.sources]
+mdeverse-residue-database = { path = ".", editable = true }
+
+# (Optionnel) Si vous voulez une commande terminal, décommentez et adaptez :
+# [project.scripts]
+# parse-gmx = "mdeverse_residue_database.parsingtools:main"
