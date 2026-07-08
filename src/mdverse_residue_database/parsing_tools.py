@@ -273,7 +273,7 @@ def apply_tdb_patches_to_residue(
                             )
                     else:
                         logger.warning("atoms list not defined")
-
+                # [WIP: this part can cause issues due to the way the add_header is handled]
                 elif section == "add":
                     if add_header is None:
                         logger.info("Adding atom (header line)")
@@ -332,6 +332,7 @@ def apply_terminaison_modification_all_res(
     for residue in list_entry_residue:
         variant_list = apply_tdb_patches_to_residue(residue, tdb_filepath)
 
+        # [WIP: Changes are needed so that even if a residue is already present withe teh same name and atoms but different force field, it should be added to the database]
         if residue.name not in residue_database:
             residue_database[residue.name] = []
         residue_database[residue.name].extend(variant_list)
