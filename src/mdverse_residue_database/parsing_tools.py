@@ -200,113 +200,89 @@ def parse_itp(
 def apply_tdb_patches_to_residue(
     residue: ResidueEntry,
     tdb_filepath: Path,
-    add_header=None,
 ) -> list[ResidueEntry]:
     """
-    Read a .tdb file and, for each terminus patch it contains, apply the
-    replace/add/delete operations to a copy of the residue's atom list.
-
+    Read a .tdb file line by line an applying modifications.
     Returns
     -------
     list[ResidueEntry]
-        One ResidueEntry variant per patch found in the file.
+        One ResidueEntry variant per completed patch.
     """
     modified_residues: list[ResidueEntry] = []
 
-    patch_name = None
-    section = None
-    atoms = None
+    atoms = residue.atoms.copy()
+    mode: str | None = None
 
     with open(tdb_filepath, "r") as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("[ None ]") and not line.startswith(";"):
-                section_match = re.match(r"^\[\s*([^\]]+)\s*\]$", line)
-                if section_match:
-                    logger.success(f"Match found in line {line}")
-                    if section_match.group(1).strip() != "None":
-                        section_name = section_match.group(1).strip()
-                        logger.info(f"Name found : {section_name}")
+        lines = [line.strip() for line in f.readlines()]
 
-                    if section_name.lower() in ("replace", "add", "delete"):
-                        section = section_name.lower()
-                        continue
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+        i += 1
 
-                    if section_name.lower() in ("impropers", "bonds", "cmap"):
-                        section = None
-                        continue
+        if line and not line.startswith(";"):
+            if line == "[ replace ]":
+                mode = "replace"
 
-                    if patch_name and patch_name != "None":
-                        logger.info(
-                            f"Applying patch {patch_name} terminaison to {residue.name}"
+            elif line == "[ add ]":
+                mode = "add"
+
+            elif line == "[ delete ]":
+                mode = "delete"
+
+            elif line.startswith("[") and line.endswith("]"):
+                if mode == "delete":
+                    logger.info(f"Patch complete, saving variant for {residue.name}")
+                    modified_residues.append(
+                        residue.model_copy(
+                            update={
+                                "atoms": atoms,
+                                "source_files": residue.source_files
+                                + [tdb_filepath.name],
+                            }
                         )
-                        modified_residues.append(
-                            residue.model_copy(
-                                update={
-                                    "atoms": atoms,
-                                    "source_files": residue.source_files
-                                    + [tdb_filepath.name],
-                                }
-                            )
-                        )
-
-                    patch_name = section_name
-                    section = None
+                    )
                     atoms = residue.atoms.copy()
-                    continue
+                mode = None
 
-                parts = line.split()
-                logger.info(f"Modification found {parts}")
+            elif mode == "replace":
+                old_name, new_name = line.split()[:2]
+                if old_name in atoms:
+                    atoms[atoms.index(old_name)] = new_name
+                    logger.info(
+                        f"Replaced {old_name} with {new_name} in {residue.name}"
+                    )
+                else:
+                    logger.warning(f"{old_name} to replace not found in {residue.name}")
 
-                if section == "replace":
-                    logger.info("Replacing atoms")
-                    old_name, new_name = parts[0], parts[1]
-                    if atoms:
-                        if old_name in atoms:
-                            atoms[atoms.index(old_name)] = new_name
-                            logger.info(
-                                f"Replaced {old_name} with {new_name} in {residue.name}"
-                            )
-                        else:
-                            logger.warning(
-                                f"{old_name} to replace not found in {residue.name}"
-                            )
+            elif mode == "add":
+                nadd = int(line.split()[0])
+                for _ in range(nadd):
+                    atom_line = lines[i]
+                    i += 1
+                    new_atom_name = atom_line.split()[0]
+                    atoms.append(new_atom_name)
+                    logger.info(f"Added {new_atom_name} to {residue.name}")
+
+            elif mode == "delete":
+                for atom_name in line.split():
+                    if atom_name in atoms:
+                        atoms.remove(atom_name)
+                        logger.info(f"Deleted {atom_name} from {residue.name}")
                     else:
-                        logger.warning("atoms list not defined")
-                # [WIP: this part can cause issues due to the way the add_header is handled]
-                elif section == "add":
-                    if add_header is None:
-                        logger.info("Adding atom (header line)")
-                        new_atom_name = parts[2]
-                        if atoms is not None:
-                            atoms.append(new_atom_name)
-                            logger.info(f"Added {new_atom_name} to {residue.name}")
-                        add_header = parts
-                    else:
-                        logger.info("Skipping add data line")
-                        add_header = None
+                        logger.warning(
+                            f"{atom_name} to delete not found in {residue.name}"
+                        )
 
-                elif section == "delete":
-                    logger.info("Deleting atoms")
-                    for atom_name in parts:
-                        if atoms:
-                            if atom_name in atoms:
-                                atoms.remove(atom_name)
-                                logger.info(f"Deleted {atom_name} from {residue.name}")
-                            else:
-                                logger.warning(
-                                    f"{atom_name} to delete not found in {residue.name}"
-                                )
-                        else:
-                            logger.warning("atoms list not defined")
-
-    if patch_name and patch_name != "None":
-        logger.info(f"Applying patch {patch_name} terminaison to {residue.name}")
+    if mode == "delete":
+        logger.info(f"Patch complete (end of file), saving variant for {residue.name}")
         modified_residues.append(
             residue.model_copy(
                 update={
                     "atoms": atoms,
-                    "source_files": [residue.source_files, tdb_filepath.name],
+                    "source_files": residue.source_files + [tdb_filepath.name],
                 }
             )
         )
