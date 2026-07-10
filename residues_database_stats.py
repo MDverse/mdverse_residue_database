@@ -43,7 +43,6 @@ def compute_statistics(residue_db_json: Path) -> dict:
 
     statistics = {
         "force_field_count": len(force_field_set),
-        "force_fields": sorted(force_field_set),
         "unique_residue_count": len(residues),
         "residue_count_per_type": residue_count_per_type,
     }
