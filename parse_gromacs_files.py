@@ -1,4 +1,3 @@
-import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -183,8 +182,7 @@ def build_residue_database(top_dir: Path) -> ResidueDatabase:
 def main(top_dir: Path, database_res_json: Path):
     residue_database = build_residue_database(top_dir)
 
-    with open(database_res_json, "w") as f:
-        json.dump(residue_database.model_dump(), f, indent=2)
+    database_res_json.write_text(residue_database.model_dump_json(indent=2))
 
     logger.success(f"Residue database written to {database_res_json}")
 
