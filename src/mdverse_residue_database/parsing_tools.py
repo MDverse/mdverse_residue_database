@@ -19,6 +19,7 @@ RTP_FILENAME_TO_TYPE = {
     "aminoacids": "PROTEIN",
     "dna": "NUCLEIC_ACID",
     "rna": "NUCLEIC_ACID",
+    "ions_opc": "ION",
     "ions": "ION",
     "tip3p": "WATER",
     "tip4pew": "WATER",
@@ -258,14 +259,12 @@ def apply_tdb_patches_to_residue(
                     logger.warning(f"{old_name} to replace not found in {residue.name}")
 
             elif mode == "add":
-                nadd = int(line.split()[0])
-                for _ in range(nadd):
-                    atom_line = lines[i]
-                    i += 1
+                atom_line = lines[i]
+                i += 1
+                if atom_line and not atom_line.startswith(";"):
                     new_atom_name = atom_line.split()[0]
                     atoms.append(new_atom_name)
                     logger.info(f"Added {new_atom_name} to {residue.name}")
-
             elif mode == "delete":
                 for atom_name in line.split():
                     if atom_name in atoms:
@@ -308,7 +307,6 @@ def apply_terminaison_modification_all_res(
     for residue in list_entry_residue:
         variant_list = apply_tdb_patches_to_residue(residue, tdb_filepath)
 
-        # [WIP: Changes are needed so that even if a residue is already present withe teh same name and atoms but different force field, it should be added to the database]
         if residue.name not in residue_database:
             residue_database[residue.name] = []
         residue_database[residue.name].extend(variant_list)
